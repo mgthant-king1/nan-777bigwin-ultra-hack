@@ -468,14 +468,16 @@ export default function App() {
           </div>
         </motion.a>
 
-        <motion.button
-          whileHover={{ scale: 1.1, rotate: 15 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => setShowAdminPanel(true)}
-          className="w-10 h-10 rounded-xl bg-[#1a1a1e] border border-white/10 flex items-center justify-center text-gray-500 hover:text-indigo-400 shadow-xl"
-        >
-          <Layout size={18} />
-        </motion.button>
+        {isAdmin && (
+          <motion.button
+            whileHover={{ scale: 1.1, rotate: 15 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowAdminPanel(true)}
+            className="w-10 h-10 rounded-xl bg-[#1a1a1e] border border-white/10 flex items-center justify-center text-gray-500 hover:text-indigo-400 shadow-xl"
+          >
+            <Layout size={18} />
+          </motion.button>
+        )}
 
         <motion.button
           whileHover={{ scale: 1.1, rotate: 15 }}
