@@ -491,19 +491,30 @@ export default function App() {
             <div className="w-full h-full bg-[#0f1115]/95 backdrop-blur-xl shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-white/10 rounded-[2rem] flex flex-col pointer-events-auto overflow-hidden">
               <div className="relative flex-1 flex flex-col p-5">
                 {/* Header */}
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-6 px-1">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 bg-indigo-500 rounded-lg shadow-[0_0_15px_rgba(99,102,241,0.5)]">
                       <Zap className="w-4 h-4 text-white" />
                     </div>
-                    <span className="text-xs font-black tracking-tighter text-white uppercase italic">777 Predictive Engine</span>
+                    <span className="text-[10px] font-black tracking-tighter text-white uppercase italic">Sovereign Intel v4.0</span>
                   </div>
-                  <button 
-                    onClick={() => setShowHack(false)}
-                    className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-gray-500 transition-colors"
-                  >
-                    <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                  </button>
+                  
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => fetchHistory()}
+                      className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 transition-colors"
+                      title="Refresh Data"
+                    >
+                      <RefreshCcw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button 
+                      onClick={() => setShowHack(false)}
+                      className="p-1.5 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-400 transition-colors border border-red-500/20"
+                      title="Exit"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Main Prediction UI (Automatic) */}
