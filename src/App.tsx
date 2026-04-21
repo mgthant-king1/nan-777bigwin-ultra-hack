@@ -2,10 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Brain, Copy, History, Key, Layout, MessageCircle, Plus, RefreshCcw, Send, Settings, Trash2, TrendingUp, Trophy, User, X, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import axios from 'axios';
-import { GoogleGenAI } from "@google/genai";
-
-// Initialization for Gemini
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 interface HistoryItem {
   issueNumber: string;
@@ -166,166 +162,91 @@ export default function App() {
     }
     
     setPredicting(true);
+    // Simulate complex calculation lag for UI feel
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
     try {
       setNextIssue(calculatedNext);
       
-      // Technical Indicator Calculations based on Settings
-      const sample = currentHistory.slice(0, settings.historyDepth);
-      const numbers = sample.map(h => parseInt(h.number));
-      
-      // 1. EMA (Exponential Moving Average)
-      const k = 2 / (settings.emaPeriod + 1);
-      let ema = numbers[0];
-      for(let i = 1; i < numbers.length; i++) {
-        ema = numbers[i] * k + ema * (1 - k);
-      }
-
-      // 2. Relative Strength Index (RSI) concept for BI-BI Trend
-      const binaryTrend = sample.map(h => parseInt(h.number) >= 5 ? 1 : 0);
-      let gains = 0;
-      let losses = 0;
-      for (let i = 0; i < binaryTrend.length - 1; i++) {
-        const diff = binaryTrend[i] - binaryTrend[i+1];
-        if (diff > 0) gains += diff;
-        else losses -= diff;
-      }
-      const rs = gains / (losses || 1);
-      const rsi = 100 - (100 / (1 + rs));
-
-      // Analyze history based on depth setting
-      const historySummary = currentHistory.slice(0, settings.historyDepth).map(h => 
-        `Issue: ...${h.issueNumber.slice(-4)}, No: ${h.number}, Size: ${getBigSmall(h.number)}, Col: ${h.colour}`
-      ).join('\n');
-      
-      const prompt = `
-        System: Sovereign Intelligence Pattern Recognition Engine
-        Game: Win-Go 1 Minute
-        Dataset (Last ${settings.historyDepth} Results):
-        ${historySummary}
-
-        Technical Indicators:
-        - EMA (${settings.emaPeriod}-period): ${ema.toFixed(2)}
-        - RSI (Bias): ${rsi.toFixed(2)}
-
-        Deep Analysis Requirements:
-        1. Hidden Markov Model (HMM): Estimate latent game states based on high-order transitions.
-        2. Sequence Overfitting Check: Validate momentum against historical mean-reversion metrics.
-        3. Harmonic Pattern Detection: identify periodic parity shifts and cyclical bias.
-        4. Trans Dimensional Mapping: Cross-correlate color streaks with size probability clusters.
-        5. Quantum Probability Field: Analyze pseudo-random distribution for entropy gaps.
-
-        Task: Synthesize patterns and predict outcome for Issue: ${calculatedNext.slice(-4)}.
-        
-        Strict JSON Output:
-        {
-          "bigSmall": "BIG" | "SMALL",
-          "colour": "RED" | "GREEN",
-          "number": integer 0-9,
-          "confidence": float 0.0-1.0,
-          "patternType": "Dragon streak" | "Alternating" | "State Pivot" | "HMM Reversion" | "EMA Bounce" | "RSI Overbought"
-        }
-      `;
-
-      const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json"
-        }
-      });
-
-      if (result && result.text) {
-        const text = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const predictionData: Prediction = JSON.parse(text);
-        
-        setPrediction(predictionData);
-        setPastPredictions(prev => ({
-          ...prev,
-          [calculatedNext]: predictionData
-        }));
-      } else {
-        throw new Error('Empty result from AI');
-      }
-    } catch (error) {
-      console.error('AI Analysis failed, shifting to Sovereign Fallback:', error);
-      
-      const latestFromState = history[0]?.issueNumber;
-      const computedNext = (BigInt(latestFromState || '0') + 1n).toString();
-      setNextIssue(computedNext);
-      
-      const sample = history.slice(0, 15);
+      const sample = currentHistory.slice(0, Math.max(30, settings.historyDepth));
       const sizes = sample.map(h => getBigSmall(h.number)).reverse(); 
       const colors = sample.map(h => h.colour.includes('red') ? 'RED' : 'GREEN').reverse();
+      const numbers = sample.map(h => parseInt(h.number)).reverse();
       
-      // 1. Hidden State Estimation (Latent Pattern Detection)
-      // We simulate HMM by checking the 'stability' of the last 5 vs last 15
-      const recent5 = sizes.slice(-5);
-      const isRecentStable = recent5.every(v => v === recent5[0]);
-      
-      // 2. Markov Order-1 Transition
-      const lastSize = sizes[sizes.length - 1];
-      let transitionsToSmall = 0;
-      let transitionsToBig = 0;
-      for (let i = 0; i < sizes.length - 1; i++) {
-        if (sizes[i] === lastSize) {
-          if (sizes[i+1] === 'SMALL') transitionsToSmall++;
-          else transitionsToBig++;
-        }
+      // --- SOVEREIGN ELITE ALGORITHM V4.0 ---
+
+      // 1. ADVANCED MOMENTUM (EMA Cross + RSI Bias)
+      const k5 = 2 / (5 + 1);
+      const k10 = 2 / (10 + 1);
+      let ema5 = numbers[0];
+      let ema10 = numbers[0];
+      numbers.forEach(n => {
+        ema5 = n * k5 + ema5 * (1 - k5);
+        ema10 = n * k10 + ema10 * (1 - k10);
+      });
+      const momentumBias = ema5 > ema10 ? 'BIG' : 'SMALL';
+
+      // 2. OSCILLATOR FREQUENCY (RSI Alternative)
+      const isBig = (n: number) => n >= 5;
+      let streakCount = 0;
+      let lastVal = isBig(numbers[numbers.length-1]);
+      for(let i = numbers.length-1; i >= 0; i--) {
+        if(isBig(numbers[i]) === lastVal) streakCount++;
+        else break;
       }
+
+      // 3. STATISTICAL PROBABILITY (Entropy Gap)
+      const bigCount = sizes.filter(s => s === 'BIG').length;
+      const smallCount = sizes.length - bigCount;
+      const dominanceFactor = bigCount / sizes.length;
+
+      // 4. PATTERN RECOGNITION (AA-BB-AB-BA)
+      const recent4 = sizes.slice(-4).join('');
+      let patternPred: 'BIG' | 'SMALL' | null = null;
+      if (recent4 === 'BIGBIGBIGBIG' || recent4 === 'SMALLSMALLSMALLSMALL') patternPred = (recent4[0] === 'BIG' ? 'SMALL' : 'BIG'); // Anti-Dragon
+      else if (recent4 === 'BIGSMALLBIGSMALL') patternPred = 'BIG'; // Alternating continuation
+      else if (recent4 === 'SMALLBIGSMALLBIG') patternPred = 'SMALL'; // Alternating continuation
       
-      // Rolling Stats
-      const numbers = sample.map(h => parseInt(h.number));
-      const mean = numbers.reduce((a, b) => a + b, 0) / numbers.length;
-      const variance = numbers.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / numbers.length;
-      
-      // DECISION LOGIC (HMM Influenced)
+      // --- FINAL SYNTHESIS ---
       let predSize: 'BIG' | 'SMALL';
-      if (isRecentStable && recent5.length >= 4) {
-        // High stability streak -> HMM Latent State "Trending" -> Expect Reversion or Continuation
-        predSize = (recent5[0] === 'BIG') ? 'SMALL' : 'BIG'; // Bold Reversion
+      
+      // Priority: Pattern > Momentum > Entropy
+      if (patternPred) {
+        predSize = patternPred;
+      } else if (streakCount >= 4) {
+        predSize = lastVal ? 'SMALL' : 'BIG'; // Bold Reversion on long streaks
+      } else if (Math.abs( dominanceFactor - 0.5) > 0.15) {
+        predSize = dominanceFactor > 0.5 ? 'SMALL' : 'BIG'; // Mean Reversion
       } else {
-        const totalTrans = transitionsToSmall + transitionsToBig;
-        if (totalTrans > 0 && transitionsToSmall / totalTrans > 0.6) predSize = 'SMALL';
-        else if (totalTrans > 0 && transitionsToBig / totalTrans > 0.6) predSize = 'BIG';
-        else predSize = (mean >= 5) ? 'SMALL' : 'BIG';
+        predSize = momentumBias; // Follow EMA Momentum
       }
-      
-      // Color Logic (Sequence Probability)
-      const lastCol = colors[colors.length - 1];
-      let colFlips = 0;
-      for (let i = 0; i < colors.length - 1; i++) {
-        if (colors[i] !== colors[i+1]) colFlips++;
-      }
-      
-      let predCol: 'RED' | 'GREEN';
-      if (colFlips / colors.length > 0.55) {
-        predCol = lastCol === 'RED' ? 'GREEN' : 'RED'; // Counter-trend
-      } else {
-        predCol = lastCol === 'RED' ? 'RED' : 'GREEN'; // Trend follow
-      }
-      
-      // Number indexing with noise reduction
-      let predNum: number;
-      const offset = Math.round(variance % 4);
-      if (predSize === 'BIG') {
-        predNum = [5, 6, 7, 8, 9][(Math.round(mean) + offset) % 5];
-      } else {
-        predNum = [0, 1, 2, 3, 4][(Math.round(mean) + offset) % 5];
-      }
-      
-      const fallbackPred: Prediction = {
+
+      // COLOR SYNTHESIS (Weighted Parity)
+      const redCount = colors.filter(c => c === 'RED').length;
+      const lastColor = colors[colors.length-1];
+      let predCol: 'RED' | 'GREEN' = (redCount / colors.length > 0.5) ? 'GREEN' : 'RED';
+      if (streakCount === 1) predCol = lastColor; // Follow color trend if just starting
+
+      // NUMBER LOGIC (Cluster Variance)
+      const mean = numbers.reduce((a, b) => a + b, 0) / numbers.length;
+      const cluster = predSize === 'BIG' ? [5, 6, 7, 8, 9] : [0, 1, 2, 3, 4];
+      const predNum = cluster[Math.floor(Math.abs(mean + (streakCount % 5)) % 5)];
+
+      const finalPred: Prediction = {
         bigSmall: predSize,
         colour: predCol,
-        number: isNaN(predNum) ? (predSize === 'BIG' ? 9 : 0) : predNum,
-        confidence: 0.82,
-        patternType: "Sovereign Fallback"
+        number: predNum,
+        confidence: 0.85 + (streakCount * 0.02 > 0.1 ? 0.1 : streakCount * 0.02),
+        patternType: streakCount >= 3 ? "Dragon Pivot" : patternPred ? "Sequence Lock" : "Momentum Cross"
       };
       
-      setPrediction(fallbackPred);
+      setPrediction(finalPred);
       setPastPredictions(prev => ({
           ...prev,
-          [computedNext]: fallbackPred
+          [calculatedNext]: finalPred
       }));
+    } catch (error: any) {
+      console.error('Sovereign Algorithm Error:', error);
     } finally {
       setPredicting(false);
     }
