@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/proxy-bigwin",
+      "destination": "/api/proxy-bigwin.ts"
+    }
+  ],
+  "framework": "vite"
+}

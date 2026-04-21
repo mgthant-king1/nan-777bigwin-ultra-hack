@@ -44,6 +44,19 @@ export default function App() {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [apiError, setApiError] = useState<string | null>(null);
+  
+  // API CONFIG (Stored in localStorage to persist across refreshes)
+  const [apiConfig, setApiConfig] = useState(() => {
+    const saved = localStorage.getItem('sovereign_api_config');
+    return saved ? JSON.parse(saved) : {
+      random: "25138ac2fb2b4330a4f7648c0315b433",
+      signature: "A6D2DF13153C3452700CD5DFA3EA3BF3",
+      timestamp: 1776752539,
+      token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzc2NzUyNTMwIiwibmJmIjoiMTc3Njc1MjUzMCIsImV4cCI6IjE3NzY3NTQzMzAiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI0LzIxLzIwMjYgMToyMjoxMCBQTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjYzMjIwMyIsIlVzZXJOYW1lIjoiOTU5NzUzNjE5ODc4IiwiVXNlclBob3RvIjoiMSIsIk5pY2tOYW1lIjoiTWVtYmVyTk5HRU1MQTYiLCJBbW91bnQiOiIwLjg5IiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI0LzIxLzIwMjYgMTI6NTI6MTAgUE0iLCJMb2dpbklQQWRkcmVzcyI6IjQzLjIxNi4yLjE5NyIsIkRiTnVtYmVyIjoiMCIsIklzdmFsaWRhdG9yIjoiMCIsIktleUNvZGUiOiIxNjAiLCJUb2tlblR5cGUiOiJBY2Nlc3NfVG9rZW4iLCJQaG9uZVR5cGUiOiIxIiwiVXNlclVHlwZSI6IjAiLCJVc2VyTmFtZTIiOiIiLCJpc3MiOiJqd3RJc3N1ZXIiLCJhdWQiOiJsb3R0ZXJ5VGlja2V0In0.NKsZCroHUC8jQoj0AJ6Dqz4vAIQq_qVQPqOHM8GHh6w"
+    };
+  });
+
   const [keys, setKeys] = useState<Record<string, { createdAt: string; type: string }>>(() => {
     const saved = localStorage.getItem('sovereign_keys');
     return saved ? JSON.parse(saved) : {};
@@ -52,6 +65,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('sovereign_keys', JSON.stringify(keys));
   }, [keys]);
+
+  useEffect(() => {
+    localStorage.setItem('sovereign_api_config', JSON.stringify(apiConfig));
+  }, [apiConfig]);
 
   const generateNewKey = () => {
     const newKey = 'KEY-' + Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -121,16 +138,20 @@ export default function App() {
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
+    setApiError(null);
     try {
-      // Using the EXACT WORKING PARAMETERS provided by the user to ensure 100% connectivity
       const response = await axios.post('/api/proxy-bigwin', {
         pageSize: 10,
         pageNo: 1,
         typeId: 1,
         language: 7,
-        random: "25138ac2fb2b4330a4f7648c0315b433",
-        signature: "A6D2DF13153C3452700CD5DFA3EA3BF3",
-        timestamp: 1776752539
+        random: apiConfig.random,
+        signature: apiConfig.signature,
+        timestamp: apiConfig.timestamp
+      }, {
+        headers: {
+          'x-proxy-auth': apiConfig.token
+        }
       });
 
       if (response.data.code === 0 && response.data.data && response.data.data.list) {
@@ -142,13 +163,15 @@ export default function App() {
         }
       } else {
         console.warn('API returned non-zero code or empty list:', response.data);
+        setApiError(`API Error: ${response.data.msg || 'Unknown error'}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch history:', error);
+      setApiError(`Connection error: ${error.message}. If on Vercel, check if proxy is active.`);
     } finally {
       setLoading(false);
     }
-  }, [history]);
+  }, [history, apiConfig]);
 
   const handlePredict = useCallback(async (currentHistory: HistoryItem[]) => {
     if (currentHistory.length === 0) return;
@@ -300,6 +323,9 @@ export default function App() {
       setIsLoggedIn(true);
       setIsAdmin(isMasterKey); // Only master key gets admin rights
       setLoginError('');
+      if (isMasterKey) {
+        setShowAdminPanel(true); // Auto show for admin convenience
+      }
     } else {
       setLoginError('Invalid access key');
     }
@@ -488,6 +514,12 @@ export default function App() {
                   </div>
 
                   <div className="flex flex-col gap-4">
+                    {apiError && (
+                      <div className="mx-1 bg-red-500/10 border border-red-500/20 rounded-lg p-2 flex items-center gap-2">
+                         <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                         <div className="text-[8px] font-bold text-red-400 uppercase tracking-wider">{apiError}</div>
+                      </div>
+                    )}
                     {/* Period & Timer */}
                     <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 px-1">
                       <div className="flex items-center gap-1.5 bg-white/5 py-1 px-2.5 rounded-full border border-white/5">
@@ -501,7 +533,17 @@ export default function App() {
                     </div>
                   
                     <AnimatePresence mode="wait">
-                      {isPending ? (
+                      {history.length === 0 && loading ? (
+                        <motion.div
+                          key="initial-loading"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="h-44 flex flex-col items-center justify-center bg-white/5 rounded-3xl border border-dashed border-white/10"
+                        >
+                           <RefreshCcw size={32} className="text-indigo-500 animate-spin mb-4" />
+                           <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Awaiting Data Stream...</div>
+                        </motion.div>
+                      ) : isPending ? (
                         <motion.div
                           key="pending-ui"
                           initial={{ opacity: 0, scale: 0.9 }}
@@ -717,128 +759,149 @@ export default function App() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
           >
-            <motion.div
+            <motion.div 
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-md bg-[#0a0a0c] border border-white/10 rounded-3xl p-8 shadow-2xl relative overflow-hidden"
+              className="w-full max-w-lg bg-[#121418] border border-white/10 rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
             >
-              {/* Background Glow */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/20 blur-3xl rounded-full -mr-16 -mt-16" />
-              
-              <div className="flex justify-between items-center mb-8 relative">
+              <div className="p-6 border-b border-white/10 flex justify-between items-center bg-indigo-500/5">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-indigo-500 rounded-xl shadow-lg shadow-indigo-500/25">
-                    <User className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black uppercase tracking-tighter text-white">Project MGTHANT</h3>
-                    <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Admin Control Board</p>
-                  </div>
+                  <Layout className="text-indigo-500" size={20} />
+                  <h3 className="text-lg font-black text-white uppercase tracking-tighter">Sovereign Control Center</h3>
                 </div>
-                <button onClick={() => setShowAdminPanel(false)} className="text-gray-500 hover:text-white transition-colors">
-                  <X size={24} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="bg-white/5 border border-white/5 p-4 rounded-2xl">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Trophy className="w-3 h-3 text-yellow-500" />
-                    <span className="text-[9px] font-black text-gray-400 uppercase">Total Wins</span>
-                  </div>
-                  <div className="text-2xl font-black text-white italic">{stats.wins}</div>
-                </div>
-                <div className="bg-white/5 border border-white/5 p-4 rounded-2xl">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap className="w-3 h-3 text-indigo-500" />
-                    <span className="text-[9px] font-black text-gray-400 uppercase">Total Draws</span>
-                  </div>
-                  <div className="text-2xl font-black text-white italic">{history.length}</div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Active Sessions</div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                      <span className="text-[11px] font-bold text-gray-300 uppercase">Current Admin</span>
-                    </div>
-                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest italic">Authorized</span>
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl opacity-50">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-gray-600" />
-                      <span className="text-[11px] font-bold text-gray-400 uppercase">Server Sync</span>
-                    </div>
-                    <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest italic">Standby</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Key Generator Section */}
-              <div className="mt-8 space-y-4">
-                <div className="flex items-center justify-between px-1">
-                  <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Key Management</div>
-                  <button 
-                    onClick={generateNewKey}
-                    className="flex items-center gap-2 py-1.5 px-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-indigo-400 hover:bg-indigo-500/20 transition-colors"
-                  >
-                    <Plus size={12} />
-                    <span className="text-[9px] font-black uppercase">Generate Key</span>
-                  </button>
-                </div>
-
-                <div className="max-h-[160px] overflow-y-auto custom-scrollbar space-y-2 pr-1">
-                  {Object.entries(keys).length === 0 ? (
-                    <div className="text-center py-6 border border-dashed border-white/5 rounded-2xl">
-                      <p className="text-[9px] text-gray-600 font-bold uppercase tracking-widest">No active keys generated</p>
-                    </div>
-                  ) : (
-                    (Object.entries(keys) as [string, { createdAt: string; type: string }][]).map(([key, data]) => (
-                      <div key={key} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 group">
-                        <div className="flex flex-col">
-                          <span className="text-xs font-mono font-bold text-indigo-300 tracking-wider uppercase">{key}</span>
-                          <span className="text-[8px] text-gray-600 mt-0.5">{data.createdAt}</span>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button 
-                            onClick={() => {
-                              navigator.clipboard.writeText(key);
-                              // Could add a toast here
-                            }}
-                            className="p-1.5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
-                          >
-                            <Copy size={12} />
-                          </button>
-                          <button 
-                            onClick={() => deleteKey(key)}
-                            className="p-1.5 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-400 transition-colors"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-10 flex gap-3">
-                <button 
-                  onClick={() => setIsLoggedIn(false)}
-                  className="flex-1 py-4 border border-white/10 rounded-xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:bg-white/5 transition-colors"
-                >
-                  Logout
-                </button>
                 <button 
                   onClick={() => setShowAdminPanel(false)}
-                  className="flex-[2] py-4 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl text-[10px] font-black text-white uppercase tracking-widest shadow-xl shadow-indigo-500/20"
+                  className="p-2 hover:bg-white/5 rounded-full text-gray-400"
                 >
-                  Return to Matrix
+                  <X size={20} />
                 </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-hide">
+                {/* API CONFIGURATION */}
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp size={16} className="text-indigo-400" />
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Network Protocol (Bypass)</h4>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[8px] font-bold text-gray-500 uppercase ml-1">Bearer Token (Expired = No Prediction)</label>
+                      <textarea 
+                        value={apiConfig.token}
+                        onChange={(e) => setApiConfig({...apiConfig, token: e.target.value})}
+                        className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-[10px] text-indigo-200 font-mono focus:outline-none focus:border-indigo-500 min-h-[80px]"
+                        placeholder="Paste new JWT token here..."
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[8px] font-bold text-gray-500 uppercase ml-1">Random Seed</label>
+                        <input 
+                          type="text"
+                          value={apiConfig.random}
+                          onChange={(e) => setApiConfig({...apiConfig, random: e.target.value})}
+                          className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-[10px] text-white font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[8px] font-bold text-gray-500 uppercase ml-1">Signature Hash</label>
+                        <input 
+                          type="text"
+                          value={apiConfig.signature}
+                          onChange={(e) => setApiConfig({...apiConfig, signature: e.target.value})}
+                          className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-[10px] text-white font-mono"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                      <label className="text-[8px] font-bold text-gray-500 uppercase ml-1">Epoch Timestamp</label>
+                      <input 
+                        type="number"
+                        value={apiConfig.timestamp}
+                        onChange={(e) => setApiConfig({...apiConfig, timestamp: parseInt(e.target.value)})}
+                        className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-[10px] text-white font-mono"
+                      />
+                    </div>
+
+                    <button 
+                      onClick={() => fetchHistory()}
+                      className="w-full py-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-[9px] font-black text-indigo-400 uppercase tracking-widest hover:bg-indigo-500/20"
+                    >
+                      Verify Quantum Link
+                    </button>
+                  </div>
+                </section>
+
+                {/* KEY MANAGEMENT */}
+                <section className="pt-4 border-t border-white/5">
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center gap-2">
+                      <Key size={16} className="text-amber-400" />
+                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Key Distribution</h4>
+                    </div>
+                    <button 
+                      onClick={generateNewKey}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-[9px] font-black text-white uppercase tracking-wider transition-colors"
+                    >
+                      <Plus size={14} />
+                      Generate
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {Object.entries(keys).length === 0 ? (
+                      <div className="text-center py-6 border border-dashed border-white/5 rounded-2xl">
+                        <p className="text-[9px] text-gray-600 font-bold uppercase tracking-widest">No active keys generated</p>
+                      </div>
+                    ) : (
+                      (Object.entries(keys) as [string, { createdAt: string; type: string }][]).map(([key, data]) => (
+                        <div key={key} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 group">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-mono font-bold text-indigo-300 tracking-wider uppercase">{key}</span>
+                            <span className="text-[8px] text-gray-600 mt-0.5">{data.createdAt}</span>
+                          </div>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(key);
+                                alert('Key copied to clipboard');
+                              }}
+                              className="p-1.5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
+                            >
+                              <Copy size={12} />
+                            </button>
+                            <button 
+                              onClick={() => deleteKey(key)}
+                              className="p-1.5 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </section>
+
+                <div className="pt-4 flex gap-3">
+                  <button 
+                    onClick={() => setIsLoggedIn(false)}
+                    className="flex-1 py-4 border border-white/10 rounded-xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:bg-white/5 transition-colors"
+                  >
+                    Logout
+                  </button>
+                  <button 
+                    onClick={() => setShowAdminPanel(false)}
+                    className="flex-[2] py-4 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl text-[10px] font-black text-white uppercase tracking-widest shadow-xl shadow-indigo-500/20"
+                  >
+                    Return to Matrix
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
