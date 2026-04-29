@@ -18,6 +18,8 @@ const bigwinAgent = new https.Agent({
   keepAlive: true,
   maxSockets: 50,
   keepAliveMsecs: 1000,
+  rejectUnauthorized: false,
+  family: 4,
 });
 
 async function startServer() {
@@ -48,12 +50,7 @@ async function startServer() {
       );
       res.json(response.data);
     } catch (error: any) {
-      console.error("Proxy error details:", {
-        message: error.message,
-        code: error.code,
-        status: error.response?.status,
-        data: error.response?.data
-      });
+      console.error("Proxy error:", error.toString());
       res.status(error.response?.status || 500).json({
         error: "Failed to fetch data from Bigwin API",
         message: error.message,

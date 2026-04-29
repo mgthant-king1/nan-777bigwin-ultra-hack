@@ -26,7 +26,16 @@ interface Prediction {
 const TELEGRAM_URL = "https://t.me/bwmoney100201";
 
 import { db, auth, useFirebaseAuth, OperationType, handleFirestoreError } from './firebase';
-import { onSnapshot, doc, setDoc, deleteDoc, collection } from 'firebase/firestore';
+import { onSnapshot, doc, setDoc, updateDoc, deleteDoc, collection } from 'firebase/firestore';
+
+const getDeviceId = () => {
+    let id = localStorage.getItem('device_id');
+    if (!id) {
+        id = 'DEV-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+        localStorage.setItem('device_id', id);
+    }
+    return id;
+};
 
 export default function App() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -68,20 +77,24 @@ export default function App() {
     token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzc2NzUyNTMwIiwibmJmIjoiMTc3Njc1MjUzMCIsImV4cCI6IjE3NzY3NTQzMzAiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI0LzIxLzIwMjYgMToyMjoxMCBQTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjYzMjIwMyIsIlVzZXJOYW1lIjoiOTU5NzUzNjE5ODc4IiwiVXNlclBob3RvIjoiMSIsIk5pY2tOYW1lIjoiTWVtYmVyTk5HRU1MQTYiLCJBbW91bnQiOiIwLjg5IiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI0LzIxLzIwMjYgMTI6NTI6MTAgUE0iLCJMb2dpbklQQWRkcmVzcyI6IjQzLjIxNi4yLjE5NyIsIkRiTnVtYmVyIjoiMCIsIklzdmFsaWRhdG9yIjoiMCIsIktleUNvZGUiOiIxNjAiLCJUb2tlblR5cGUiOiJBY2Nlc3NfVG9rZW4iLCJQaG9uZVR5cGUiOiIxIiwiVXNlclVHlwZSI6IjAiLCJVc2VyTmFtZTIiOiIiLCJpc3MiOiJqd3RJc3N1ZXIiLCJhdWQiOiJsb3R0ZXJ5VGlja2V0In0.NKsZCroHUC8jQoj0AJ6Dqz4vAIQq_qVQPqOHM8GHh6w"
   });
 
-  const [keys, setKeys] = useState<Record<string, { createdAt: string; type: string; expiresAt?: number | null }>>({});
+  const [keys, setKeys] = useState<Record<string, { createdAt: string; type: string; expiresAt?: number | null; deviceId?: string }>>({});
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60000); // update every minute
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-logout if key expires
+  // Auto-logout if key expires or is deleted
   useEffect(() => {
     if (isLoggedIn && !isAdmin) {
       const trimmedPassword = password.trim();
       const matchedKey = keys[trimmedPassword] || keys[trimmedPassword.toUpperCase()];
-      if (matchedKey?.expiresAt && now > matchedKey.expiresAt) {
-        handleLogout();
+      if (!matchedKey) {
+        handleLogout(); // Key was deleted
+      } else if (matchedKey.expiresAt && now > matchedKey.expiresAt) {
+        handleLogout(); // Key expired
+      } else if (matchedKey.deviceId && matchedKey.deviceId !== getDeviceId()) {
+        handleLogout(); // Key used by another device
       }
     }
   }, [isLoggedIn, isAdmin, password, keys, now]);
@@ -493,7 +506,7 @@ export default function App() {
     setShowUserModal(false);
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedPassword = password.trim().toUpperCase();
     const isMasterKey = trimmedPassword === "PREMIUM" || password.trim() === "PREMIUM";
@@ -504,17 +517,28 @@ export default function App() {
     
     let isValidGeneratedKey = false;
     let isExpired = false;
+    let isInUseByOther = false;
 
     if (matchedKeyId) {
       const keyData = keys[matchedKeyId];
       if (keyData.expiresAt && Date.now() > keyData.expiresAt) {
         isExpired = true;
+      } else if (keyData.deviceId && keyData.deviceId !== getDeviceId()) {
+        isInUseByOther = true;
       } else {
         isValidGeneratedKey = true;
       }
     }
 
     if (isMasterKey || isValidGeneratedKey) {
+      if (isValidGeneratedKey && matchedKeyId && !keys[matchedKeyId].deviceId) {
+         try {
+             await updateDoc(doc(db, 'keys', matchedKeyId), { deviceId: getDeviceId() });
+         } catch (error) {
+             console.error("Failed to update deviceId", error);
+         }
+      }
+
       setIsLoggedIn(true);
       setIsAdmin(isMasterKey); // Only master key gets admin rights
       setLoginError('');
@@ -524,6 +548,8 @@ export default function App() {
     } else {
       if (isExpired) {
          setLoginError('Key has expired');
+      } else if (isInUseByOther) {
+         setLoginError('Key is already in use by another device');
       } else {
          setLoginError('Invalid access key');
       }
@@ -570,9 +596,22 @@ export default function App() {
             </button>
           </form>
 
-          <p className="text-center mt-8 text-[9px] text-gray-600 font-bold uppercase tracking-widest">
-            Restricted Access • Sovereign Intelligence
-          </p>
+          <div className="mt-8 flex flex-col items-center gap-4">
+            <p className="text-center text-[9px] text-gray-600 font-bold uppercase tracking-widest">
+              DEV BY MG THANT • Sovereign Intelligence
+            </p>
+            <a 
+              href="https://t.me/mgthantIT"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-6 py-3 bg-[#229ED9]/10 text-[#229ED9] hover:bg-[#229ED9]/20 border border-[#229ED9]/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors"
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.223-.548.223l.188-2.85 5.18-4.68c.223-.198-.054-.309-.346-.116l-6.405 4.02-2.766-.86c-.602-.187-.615-.602.126-.893l10.82-4.17c.5-.188.95.115.82.88z" />
+              </svg>
+              Connect Dev
+            </a>
+          </div>
         </motion.div>
       </div>
     );
