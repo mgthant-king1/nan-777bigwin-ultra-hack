@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Since the app has no auth other than a hardcoded master password in the frontend,
+    // we allow public read/write to keys and config in order to make it work.
+    // In a real application, you would add an admin role check (e.g. isAdmin()).
+    match /keys/{keyId} {
+      allow read: if true; // anyone can verify their key
+      allow write: if true; // anyone with the UI can generate/delete keys right now
+    }
+
+    match /config/api {
+      allow read: if true; // anyone using the app needs the config to fetch proxy
+      allow write: if true; // anyone with UI can change config
+    }
+  }
+}

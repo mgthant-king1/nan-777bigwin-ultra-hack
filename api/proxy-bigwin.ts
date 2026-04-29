@@ -1,5 +1,17 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import axios from 'axios';
+import https from 'https';
+import { EventEmitter } from 'events';
+
+// Global stabilization for deep-level analytical stream listeners
+EventEmitter.defaultMaxListeners = 0;
+process.setMaxListeners(0);
+
+const bigwinAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 50,
+  keepAliveMsecs: 1000,
+});
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -11,6 +23,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       "https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList",
       req.body,
       {
+        timeout: 55000, // 55s timeout
+        httpsAgent: bigwinAgent, // Neural socket reuse
         headers: {
           "Content-Type": "application/json;charset=UTF-8",
           "Accept": "application/json, text/plain, */*",
@@ -24,10 +38,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
     res.status(200).json(response.data);
   } catch (error: any) {
-    console.error("Proxy error:", error.message);
+    console.error("Proxy error details:", {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      data: error.response?.data
+    });
     res.status(error.response?.status || 500).json({
       error: "Failed to fetch data from Bigwin API",
-      message: error.message
+      message: error.message,
+      code: error.code,
+      details: error.response?.data
     });
   }
 }

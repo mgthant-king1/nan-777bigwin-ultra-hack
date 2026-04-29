@@ -1,0 +1,34 @@
+{
+  "entities": {
+    "key": {
+      "title": "Access Key",
+      "description": "A generated key to log into the app",
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string" },
+        "type": { "type": "string" }
+      },
+      "required": ["createdAt", "type"]
+    },
+    "apiConfig": {
+      "title": "API Config",
+      "description": "API Configuration",
+      "type": "object",
+      "properties": {
+        "token": { "type": "string" },
+        "proxyUrl": { "type": "string" }
+      },
+      "required": ["token", "proxyUrl"]
+    }
+  },
+  "firestore": {
+    "/keys/{keyId}": {
+      "schema": { "$ref": "#/entities/key" },
+      "description": "Keys allowed to access the app"
+    },
+    "/config/api": {
+      "schema": { "$ref": "#/entities/apiConfig" },
+      "description": "API configuration"
+    }
+  }
+}
