@@ -11,6 +11,8 @@ const bigwinAgent = new https.Agent({
   keepAlive: true,
   maxSockets: 50,
   keepAliveMsecs: 1000,
+  rejectUnauthorized: false,
+  family: 4,
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

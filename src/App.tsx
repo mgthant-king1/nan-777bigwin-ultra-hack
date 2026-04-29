@@ -55,6 +55,7 @@ export default function App() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [newKeyExpiry, setNewKeyExpiry] = useState<number | null>(null); // expiration for keys
+  const [customKeyName, setCustomKeyName] = useState<string>('');
 
   const [settings, setSettings] = useState({
     historyDepth: 15,
@@ -136,7 +137,18 @@ export default function App() {
   }, [apiConfig, isAuthReady]);
 
   const generateNewKey = async () => {
-    const newKey = 'KEY-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    let newKey = customKeyName.trim().toUpperCase();
+    if (!newKey) {
+      newKey = 'KEY-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+    
+    // Convert to exactly uppercase if needed maybe? Or respect user input.
+    // Actually the user input parsing already enforces uppercase for the generated random key, so doing it here for custom key as well.
+    if (keys[newKey]) {
+      alert("This key already exists!");
+      return;
+    }
+
     const typeLabel = newKeyExpiry ? `${newKeyExpiry} Hours` : 'Lifetime';
     const expiresAt = newKeyExpiry ? Date.now() + newKeyExpiry * 60 * 60 * 1000 : null;
     const keyData = { 
@@ -146,6 +158,7 @@ export default function App() {
     };
     try {
       await setDoc(doc(db, 'keys', newKey), keyData);
+      setCustomKeyName(''); // Reset after successful creation
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `keys/${newKey}`);
     }
@@ -1530,12 +1543,19 @@ export default function App() {
 
                 {/* KEY MANAGEMENT */}
                 <section className="pt-4 border-t border-white/5">
-                  <div className="flex justify-between items-center mb-4">
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4">
                     <div className="flex items-center gap-2">
                       <Key size={16} className="text-amber-400" />
                       <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Key Distribution</h4>
                     </div>
                     <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={customKeyName}
+                        onChange={(e) => setCustomKeyName(e.target.value)}
+                        placeholder="CUSTOM KEY..."
+                        className="bg-white/10 border border-white/20 rounded-lg text-[9px] font-bold text-white px-2 py-1.5 focus:outline-none focus:border-indigo-500 transition-colors uppercase w-24 placeholder:text-gray-600"
+                      />
                       <select 
                         value={newKeyExpiry || ''} 
                         onChange={(e) => setNewKeyExpiry(e.target.value ? Number(e.target.value) : null)}
@@ -1549,9 +1569,9 @@ export default function App() {
                       </select>
                       <button 
                         onClick={generateNewKey}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-[9px] font-black text-white uppercase tracking-wider transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-[9px] font-black text-white uppercase tracking-wider transition-colors"
                       >
-                        <Plus size={14} />
+                        <Plus size={12} />
                         Generate
                       </button>
                     </div>
